@@ -9,6 +9,8 @@ package GestorTareas.vista;
  * @author jesuz
  */
 import GestorTareas.modelo.BaseDeDatos;
+import GestorTareas.modelo.GestorTareas;
+import GestorTareas.modelo.PanelLateral;
 import GestorTareas.modelo.Tarea;
 import GestorTareas.modelo.Usuario;
 
@@ -22,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class InterfazPanelLateral extends JPanel {
     private Usuario user;
@@ -31,18 +34,23 @@ public class InterfazPanelLateral extends JPanel {
     private JTextField searchField;
     private InterfazPrincipal parent;
     private JButton selectedFilterButton;
+    private PanelLateral panelLateral;
+    private GestorTareas gestor;
 
     public InterfazPanelLateral(InterfazPrincipal parent, BaseDeDatos db, Usuario user) {
         this.parent = parent;
         this.db = db;
         this.user = user;
 
+        List<String> categorias = obtenerCategoriasUnicas();
+        this.panelLateral = new PanelLateral(categorias);
+        this.gestor = new GestorTareas(null, db);
+
         setLayout(new BorderLayout());
         setPreferredSize(new Dimension(320, 0));
         setBackground(new Color(26, 26, 26));
         setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, new Color(44, 62, 80)));
 
-        // Panel de búsqueda
         JPanel searchPanel = new JPanel(new BorderLayout());
         searchPanel.setBackground(new Color(26, 26, 26));
         searchPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
@@ -57,7 +65,6 @@ public class InterfazPanelLateral extends JPanel {
         searchField.setFont(new Font("Arial", Font.PLAIN, 16));
         searchField.addActionListener(e -> filterTasks(searchField.getText()));
 
-        // Icono lupa
         URL lupaURL = getClass().getResource("/lupa.png");
         if (lupaURL != null) {
             ImageIcon lupaImg = new ImageIcon(new ImageIcon(lupaURL).getImage().getScaledInstance(20, 20, Image.SCALE_SMOOTH));
@@ -68,7 +75,6 @@ public class InterfazPanelLateral extends JPanel {
         searchPanel.add(searchField, BorderLayout.CENTER);
         add(searchPanel, BorderLayout.NORTH);
 
-        // Lista de tareas
         titlesModel = new DefaultListModel<>();
         taskTitlesList = new JList<>(titlesModel);
         taskTitlesList.setCellRenderer(new TaskRenderer());
@@ -97,13 +103,12 @@ public class InterfazPanelLateral extends JPanel {
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         add(scrollPane, BorderLayout.CENTER);
 
-        // Panel de filtros
         JPanel filterPanel = new JPanel(new GridLayout(4, 1, 0, 10));
         filterPanel.setBackground(new Color(26, 26, 26));
         filterPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         String[] filters = {"Mi Día", "Importante", "Tareas", "Todas"};
-        String[] icons = {"/mi dia.png", "/importante.png", "/tareas.png", null}; // null para "Todas"
+        String[] icons = {"/mi dia.png", "/importante.png", "/tareas.png", null};
         for (int i = 0; i < filters.length; i++) {
             JButton filterButton = createFilterButton(filters[i], icons[i]);
             final String filter = filters[i];
@@ -118,9 +123,20 @@ public class InterfazPanelLateral extends JPanel {
         loadTasks();
     }
 
+    private List<String> obtenerCategoriasUnicas() {
+        try {
+            List<Tarea> tasks = db.obtenerTareasPorUsuario(user.getIdUsuario());
+            return tasks.stream()
+                    .map(Tarea::getAsignatura)
+                    .distinct()
+                    .collect(Collectors.toList());
+        } catch (SQLException ex) {
+            return List.of();
+        }
+    }
+
     private JButton createFilterButton(String text, String iconPath) {
         JButton button = new JButton();
-        // Solo cargamos la imagen si el path no es null y existe
         if (iconPath != null) {
             URL iconURL = getClass().getResource(iconPath);
             if (iconURL != null) {
@@ -179,22 +195,32 @@ public class InterfazPanelLateral extends JPanel {
         try {
             titlesModel.clear();
             List<Tarea> tasks = db.obtenerTareasPorUsuario(user.getIdUsuario());
-            for (Tarea t : tasks) {
-                if (t.getEstado() != Tarea.Estado.Pendiente) continue;
-                boolean matches = switch (filter) {
-                    case "Mi Día" -> t.getFechaDeVencimiento().toLocalDate().equals(LocalDate.now());
-                    case "Importante" -> t.getPrioridad() == Tarea.Prioridad.Importante;
-                    case "Tareas" -> true;
-                    case "Todas" -> true;
-                    default -> t.getTituloTarea().toLowerCase().contains(filter.toLowerCase());
-                };
-                if (matches) titlesModel.addElement(t);
+            List<Tarea> filteredTasks = switch (filter) {
+                case "Mi Día" -> tasks.stream()
+                        .filter(t -> t.getEstado() == Tarea.Estado.Pendiente && t.getFechaDeVencimiento().toLocalDate().equals(LocalDate.now()))
+                        .toList();
+                case "Importante" -> tasks.stream()
+                        .filter(t -> t.getEstado() == Tarea.Estado.Pendiente && t.getPrioridad() == Tarea.Prioridad.Importante)
+                        .toList();
+                case "Tareas" -> tasks.stream()
+                        .filter(t -> t.getEstado() == Tarea.Estado.Pendiente)
+                        .toList();
+                case "Todas" -> tasks;
+                default -> {
+                    gestor.setListaTareas(tasks);
+                    yield gestor.filtrarTareas(filter);
+                }
+            };
+            if (panelLateral.getCategorias().contains(filter)) {
+                filteredTasks = panelLateral.filtrarPorCategoria(filter, filteredTasks);
             }
+            filteredTasks.forEach(titlesModel::addElement);
             ToastNotification.showToast(parent, "Filtro aplicado: " + filter, false);
         } catch (SQLException ex) {
             ToastNotification.showToast(parent, "Error al filtrar tareas: " + ex.getMessage(), true);
         }
     }
+
     private void showTaskDetails(Tarea task) {
         JDialog detailsDialog = new JDialog(parent, task.getTituloTarea(), true);
         detailsDialog.setSize(700, 600);

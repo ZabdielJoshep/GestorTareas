@@ -102,6 +102,18 @@ public class BaseDeDatos {
         stmt.executeUpdate();
         stmt.close();
     }
+    
+    public void editarUsuario(Usuario user) throws SQLException {
+        String sql = "UPDATE usuario SET nombre=?, correoElectronico=?, contraseñaHash=? WHERE idUsuario=?";
+        PreparedStatement stmt = conexion.prepareStatement(sql);
+        stmt.setString(1, user.getNombre());
+        stmt.setString(2, user.getCorreoElectronico());
+        stmt.setString(3, user.getContraseña());
+        stmt.setInt(4, user.getIdUsuario());
+        stmt.executeUpdate();
+        stmt.close();
+    }
+
 
     public void guardarTarea(Tarea tarea, int idUsuario) throws SQLException {
         String sql = "INSERT INTO tarea (idUsuario, tituloTarea, descripcionTarea, fechaVencimiento, asignatura, estado, prioridad) VALUES (?, ?, ?, ?, ?, ?, ?)";

@@ -15,6 +15,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>24</maven.compiler.release>
 
+        <!-- Clase con el método main -->
         <main.class>GestorTareas.GestorTareas</main.class>
     </properties>
 
@@ -53,7 +54,7 @@
     <build>
         <plugins>
 
-            <!-- ⭐ MAVEN SHADE PLUGIN (fat jar) -->
+            <!-- ⭐ MAVEN SHADE PLUGIN (fat jar ejecutable corregido) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -65,7 +66,27 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+
+                            <!-- Adjuntar el jar sombreado como un archivo separado -->
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>shaded</shadedClassifierName>
+
+                            <!-- No generar el POM reducido -->
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+
+                            <!-- 🔥 SOLUCIÓN AL ERROR "Invalid signature file digest" -->
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+
+                            <!-- Main class -->
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>${main.class}</mainClass>

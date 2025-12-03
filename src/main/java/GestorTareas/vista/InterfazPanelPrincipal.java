@@ -9,6 +9,9 @@ package GestorTareas.vista;
  * @author jesuz
  */
 import GestorTareas.modelo.BaseDeDatos;
+import GestorTareas.modelo.Calendario;
+import GestorTareas.modelo.PanelLateral;
+import GestorTareas.modelo.PanelPrincipal;
 import GestorTareas.modelo.Tarea;
 import GestorTareas.modelo.Usuario;
 
@@ -37,15 +40,22 @@ public class InterfazPanelPrincipal extends JPanel {
     private JLabel dateLabel;
     private Timer vencimientoTimer;
     private static Set<String> notifiedVencidas = new HashSet<>();
+    private PanelPrincipal panelPrincipal;
+    private Calendario calendario;
 
     public InterfazPanelPrincipal(InterfazPrincipal parent, BaseDeDatos db, Usuario user) {
         this.parent = parent;
         this.db = db;
         this.user = user;
 
+        List<Tarea> tareas = obtenerTareas();
+        List<String> categorias = tareas.stream().map(Tarea::getAsignatura).distinct().toList();
+        PanelLateral panelLateral = new PanelLateral(categorias);
+        this.panelPrincipal = new PanelPrincipal(tareas, panelLateral);
+        this.calendario = new Calendario(Calendario.VistaActual.Semanal, tareas);
+
         setLayout(new BorderLayout());
         setBackground(new Color(26, 26, 26));
-
 
         JPanel dateTimePanel = new JPanel(new BorderLayout());
         dateTimePanel.setOpaque(false);
@@ -55,12 +65,26 @@ public class InterfazPanelPrincipal extends JPanel {
         timeLabel.setFont(new Font("Arial", Font.BOLD, 72));
         timeLabel.setForeground(Color.WHITE);
         timeLabel.setHorizontalAlignment(SwingConstants.LEFT);
+        timeLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        timeLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                showCalendario();
+            }
+        });
         dateTimePanel.add(timeLabel, BorderLayout.NORTH);
 
         dateLabel = new JLabel();
         dateLabel.setFont(new Font("Arial", Font.PLAIN, 36));
         dateLabel.setForeground(Color.WHITE);
         dateLabel.setHorizontalAlignment(SwingConstants.LEFT);
+        dateLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        dateLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                showCalendario();
+            }
+        });
         dateTimePanel.add(dateLabel, BorderLayout.SOUTH);
 
         JLabel background = new JLabel(new ImageIcon(getClass().getResource("/fondo.png")));
@@ -135,7 +159,9 @@ public class InterfazPanelPrincipal extends JPanel {
         updateDateTime();
         loadTasks();
 
-        ToastNotification.showToast(parent, "Inicio de sesión correcto. Bienvenid@ \n de nuevo.", false);
+        ToastNotification.showToast(parent, "Inicio de sesion correcto. Bienvenido de nuevo.", false);
+
+        panelPrincipal.mostrarFechaHoraActual();
 
         vencimientoTimer = new Timer();
         vencimientoTimer.scheduleAtFixedRate(new TimerTask() {
@@ -144,6 +170,57 @@ public class InterfazPanelPrincipal extends JPanel {
                 checkVencimientos();
             }
         }, 0, 60000);
+
+        Timer timeUpdateTimer = new Timer();
+        timeUpdateTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                SwingUtilities.invokeLater(() -> updateDateTime());
+            }
+        }, 0, 1000);
+    }
+
+    private List<Tarea> obtenerTareas() {
+        try {
+            return db.obtenerTareasPorUsuario(user.getIdUsuario());
+        } catch (SQLException ex) {
+            return List.of();
+        }
+    }
+
+    private void showCalendario() {
+        JDialog calendarioDialog = new JDialog(parent, "Calendario", true);
+        calendarioDialog.setSize(600, 400);
+        calendarioDialog.setLocationRelativeTo(parent);
+        calendarioDialog.setLayout(new BorderLayout());
+        calendarioDialog.getContentPane().setBackground(new Color(26, 26, 26));
+
+        List<Tarea> tareasActuales = obtenerTareas();
+        CalendarioPanel calendarioPanel = new CalendarioPanel(calendario, tareasActuales);
+
+        JPanel controlPanel = new JPanel(new FlowLayout());
+        controlPanel.setBackground(new Color(26, 26, 26));
+        JButton semanalBtn = new JButton("Vista Semanal");
+        semanalBtn.setBackground(new Color(0, 123, 255));
+        semanalBtn.setForeground(Color.WHITE);
+        semanalBtn.addActionListener(e -> {
+            calendario.mostrarVistaSemanal();
+            calendarioPanel.updateVista();
+        });
+        JButton mensualBtn = new JButton("Vista Mensual");
+        mensualBtn.setBackground(new Color(0, 123, 255));
+        mensualBtn.setForeground(Color.WHITE);
+        mensualBtn.addActionListener(e -> {
+            calendario.mostrarVistaMensual();
+            calendarioPanel.updateVista();
+        });
+        controlPanel.add(semanalBtn);
+        controlPanel.add(mensualBtn);
+        calendarioDialog.add(controlPanel, BorderLayout.NORTH);
+
+        calendarioDialog.add(calendarioPanel, BorderLayout.CENTER);
+
+        calendarioDialog.setVisible(true);
     }
 
     private void checkVencimientos() {
@@ -153,7 +230,7 @@ public class InterfazPanelPrincipal extends JPanel {
                 if (task.getFechaDeVencimiento().isBefore(LocalDateTime.now()) && task.getEstado() == Tarea.Estado.Pendiente) {
                     String taskId = String.valueOf(task.getIdTarea());
                     if (!notifiedVencidas.contains(taskId)) {
-                        SwingUtilities.invokeLater(() -> ToastNotification.showToast(parent, "¡Tarea vencida! " + task.getTituloTarea() + " está pendiente.", true));
+                        SwingUtilities.invokeLater(() -> ToastNotification.showToast(parent, "Tarea vencida: " + task.getTituloTarea() + " esta pendiente.", true));
                         notifiedVencidas.add(taskId);
                     }
                     task.setEstado(Tarea.Estado.Pendiente);
@@ -230,7 +307,7 @@ public class InterfazPanelPrincipal extends JPanel {
         statusArea.setLineWrap(true);
         statusArea.setWrapStyleWord(true);
         statusArea.setEditable(false);
-        statusArea.setBorder(BorderFactory.createEmptyBorder());
+        setBorder(BorderFactory.createEmptyBorder());
         panel.add(statusArea, gbc);
 
         gbc.gridy = 5;
@@ -241,7 +318,7 @@ public class InterfazPanelPrincipal extends JPanel {
         priorityArea.setLineWrap(true);
         priorityArea.setWrapStyleWord(true);
         priorityArea.setEditable(false);
-        priorityArea.setBorder(BorderFactory.createEmptyBorder());
+        setBorder(BorderFactory.createEmptyBorder());
         panel.add(priorityArea, gbc);
 
         gbc.gridwidth = 1; gbc.gridy = 6;
@@ -308,7 +385,7 @@ public class InterfazPanelPrincipal extends JPanel {
             task.marcarComoCompletada();
             try {
                 db.editarTarea(task);
-                parent.refreshTasks(); 
+                parent.refreshTasks();
                 ToastNotification.showToast(parent, "Tarea completada.", false);
             } catch (SQLException ex) {
                 ToastNotification.showToast(parent, "Error al completar tarea: " + ex.getMessage(), true);
@@ -348,23 +425,24 @@ public class InterfazPanelPrincipal extends JPanel {
         try {
             taskModel.clear();
             List<Tarea> tasks = db.obtenerTareasPorUsuario(user.getIdUsuario());
+            panelPrincipal.setListaTareas(tasks);
+            panelPrincipal.mostrarTareas();
+            List<Tarea> filteredTasks = panelPrincipal.filtrarTareas(Tarea.Estado.Pendiente);
+            panelPrincipal.ordenarTareasPorFecha();
             LocalDate today = LocalDate.now();
-            tasks.stream()
-                .filter(t -> t.getEstado() == Tarea.Estado.Pendiente &&
-                             (t.getPrioridad() == Tarea.Prioridad.Importante ||
-                              t.getFechaDeVencimiento().toLocalDate().isBefore(today.plusDays(3))))
-                .sorted(Comparator.comparing((Tarea t) -> t.getPrioridad() == Tarea.Prioridad.Importante ? 0 : 1)
-                        .thenComparing(Tarea::getFechaDeVencimiento))
-                                .limit(2) 
+            filteredTasks.stream()
+                .filter(t -> t.getPrioridad() == Tarea.Prioridad.Importante ||
+                             t.getFechaDeVencimiento().toLocalDate().isBefore(today.plusDays(3)))
+                .limit(2)
                 .forEach(task -> {
                     if (task.getFechaDeVencimiento().isBefore(LocalDateTime.now())) {
                         String taskId = String.valueOf(task.getIdTarea());
                         if (!notifiedVencidas.contains(taskId)) {
-                            ToastNotification.showToast(parent, "Tarea vencida: " + task.getTituloTarea() + " está pendiente.", true);
+                            ToastNotification.showToast(parent, "Tarea vencida: " + task.getTituloTarea() + " esta pendiente.", true);
                             notifiedVencidas.add(taskId);
                         }
                     }
-                    taskModel.addElement(task);
+                                        taskModel.addElement(task);
                 });
         } catch (SQLException ex) {
             ToastNotification.showToast(parent, "Error al cargar tareas: " + ex.getMessage(), true);
@@ -387,3 +465,4 @@ public class InterfazPanelPrincipal extends JPanel {
         }
     }
 }
+       

@@ -5,16 +5,16 @@
 package GestorTareas.vista;
 
 /**
- *
  * @author jesuz
  */
 import GestorTareas.modelo.BaseDeDatos;
+import GestorTareas.modelo.Sesion;
 import GestorTareas.modelo.Usuario;
 
 import javax.swing.*;
 import java.awt.*;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 public class InterfazPrincipal extends JFrame {
     private Usuario user;
@@ -23,10 +23,19 @@ public class InterfazPrincipal extends JFrame {
     private InterfazPanelLateral panelLateral;
     private Timer timer;
     private JButton logoutIcon;
+    private Sesion sesion;
 
-    public InterfazPrincipal(Usuario user, BaseDeDatos db) {
+    public InterfazPrincipal(Usuario user, BaseDeDatos db, Sesion sesion) {
         this.user = user;
         this.db = db;
+        this.sesion = sesion;
+
+        if (!sesion.validarSesion()) {
+            ToastNotification.showToast(this, "Sesion expirada.", true);
+            new VentanaLogin().setVisible(true);
+            dispose();
+            return;
+        }
 
         setTitle("Gestor de Tareas - Panel Principal");
         setExtendedState(JFrame.MAXIMIZED_BOTH);
@@ -52,8 +61,11 @@ public class InterfazPrincipal extends JFrame {
             logoutItem.setForeground(Color.WHITE);
             logoutItem.setBackground(new Color(44, 62, 80));
             logoutItem.addActionListener(ev -> {
-                int confirm = JOptionPane.showConfirmDialog(this, "¿Cerrar sesión?", "Confirmar", JOptionPane.YES_NO_OPTION);
+                int confirm = JOptionPane.showConfirmDialog(this, "¿Cerrar sesion?", "Confirmar", JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
+                    sesion.cerrarSesion();
+                    user.cerrarSesion();
+                    db.cerrarConexion();
                     dispose();
                     new VentanaLogin().setVisible(true);
                 }

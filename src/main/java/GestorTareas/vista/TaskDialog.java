@@ -76,6 +76,7 @@ public class TaskDialog extends JDialog {
         descArea.setForeground(Color.WHITE);
         descArea.setLineWrap(true);
         descArea.setWrapStyleWord(true);
+        descArea.setEditable(true);
         descArea.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(52, 73, 94)),
             BorderFactory.createEmptyBorder(10, 10, 10, 10))); 
@@ -179,7 +180,8 @@ public class TaskDialog extends JDialog {
             return;
         }
 
-        if (!fecha.isAfter(LocalDateTime.now())) {
+        Tarea tempTask = new Tarea(0, title, desc, fecha, subject, Tarea.Estado.Pendiente, Tarea.Prioridad.Normal);
+        if (!tempTask.validarFechaVencimiento()) {
             ToastNotification.showToast((Window) this, "La fecha de vencimiento debe ser futura.", true);
             return;
         }

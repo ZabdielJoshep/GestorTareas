@@ -25,9 +25,9 @@ public class VentanaRegistro extends JDialog {
     private JButton createButton;
     private JToggleButton showPasswordButton;
     private BaseDeDatos db;
-    private JFrame parent;
+    private VentanaLogin parent;
 
-    public VentanaRegistro(JFrame parent, BaseDeDatos db) {
+    public VentanaRegistro(VentanaLogin parent, BaseDeDatos db) {
         super(parent, "Crear Cuenta", true);
         this.parent = parent;
         this.db = db;
@@ -44,14 +44,12 @@ public class VentanaRegistro extends JDialog {
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-       
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 3;
         JLabel titleLabel = new JLabel("Crear Cuenta", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
         titleLabel.setForeground(new Color(0, 123, 255));
         panel.add(titleLabel, gbc);
 
-      
         gbc.gridwidth = 1; gbc.gridy = 1;
         panel.add(new JLabel("Nombre:"), gbc);
         gbc.gridx = 1; gbc.gridwidth = 2;
@@ -61,7 +59,6 @@ public class VentanaRegistro extends JDialog {
             BorderFactory.createEmptyBorder(5, 5, 5, 5)));
         panel.add(nameField, gbc);
 
-        
         gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1;
         panel.add(new JLabel("Correo:"), gbc);
         gbc.gridx = 1; gbc.gridwidth = 2;
@@ -71,7 +68,6 @@ public class VentanaRegistro extends JDialog {
             BorderFactory.createEmptyBorder(5, 5, 5, 5)));
         panel.add(emailField, gbc);
 
-        
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 1;
         panel.add(new JLabel("Contraseña:"), gbc);
         gbc.gridx = 1;
@@ -82,7 +78,6 @@ public class VentanaRegistro extends JDialog {
         passwordField.setEchoChar('\u2022'); 
         panel.add(passwordField, gbc);
 
-        
         gbc.gridx = 2;
         showPasswordButton = new JToggleButton(new ImageIcon(new ImageIcon(getClass().getResource("/ojo_tachado.png")).getImage().getScaledInstance(40, 30, Image.SCALE_SMOOTH)));
         showPasswordButton.setPreferredSize(new Dimension(40, 30));
@@ -91,7 +86,6 @@ public class VentanaRegistro extends JDialog {
         showPasswordButton.addActionListener(new ShowPasswordAction());
         panel.add(showPasswordButton, gbc);
 
-        
         gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 3;
         createButton = new JButton("Crear Cuenta");
         createButton.setBackground(new Color(0, 123, 255));
@@ -103,44 +97,44 @@ public class VentanaRegistro extends JDialog {
 
         add(panel);
     }
-
+    
     private class RegisterAction implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            String name = nameField.getText().trim();
-            String email = emailField.getText().trim();
-            String password = new String(passwordField.getPassword());
+        String name = nameField.getText().trim();
+        String email = emailField.getText().trim();
+        String password = new String(passwordField.getPassword());
 
-            if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
-                ToastNotification.showToast(VentanaRegistro.this, "Complete todos los campos.", true); 
+        if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
+            ToastNotification.showToast(VentanaRegistro.this, "Complete todos los campos.", true); 
+            return;
+        }
+
+        if (!Usuario.validarCorreo(email)) {
+            ToastNotification.showToast(VentanaRegistro.this, "Correo invalido.", true); 
+            return;
+        }
+
+        try {
+            if (db.obtenerUsuarioPorCorreo(email) != null) {
+                ToastNotification.showToast(VentanaRegistro.this, "Correo ya en uso.", true); 
                 return;
             }
 
-            if (!Usuario.validarCorreo(email)) {
-                ToastNotification.showToast(VentanaRegistro.this, "Correo inválido.", true); 
-                return;
+            String hashedPassword = Encriptador.hashearContraseña(password);
+            Usuario newUser = Usuario.registrar(name, email, hashedPassword);
+            if (newUser != null) {
+                db.guardarUsuario(newUser);
+                ToastNotification.showToast(parent, "Cuenta creada exitosamente.", false);
+                dispose();
+            } else {
+                ToastNotification.showToast(VentanaRegistro.this, "Error al crear cuenta.", true); 
             }
-
-            try {
-                if (db.obtenerUsuarioPorCorreo(email) != null) {
-                    ToastNotification.showToast(VentanaRegistro.this, "Correo ya en uso.", true); 
-                    return;
-                }
-
-                String hashedPassword = Encriptador.hashearContraseña(password);
-                Usuario newUser = Usuario.registrar(name, email, hashedPassword);
-                if (newUser != null) {
-                    db.guardarUsuario(newUser);
-                    ToastNotification.showToast(VentanaRegistro.this, "Cuenta creada.", false); 
-                    dispose();
-                } else {
-                    ToastNotification.showToast(VentanaRegistro.this, "Error al crear cuenta.", true); 
-                }
-            } catch (SQLException ex) {
-                ToastNotification.showToast(VentanaRegistro.this, "Error de base de datos: " + ex.getMessage(), true); 
-            }
+        } catch (SQLException ex) {
+            ToastNotification.showToast(VentanaRegistro.this, "Error de base de datos: " + ex.getMessage(), true); 
         }
     }
+}
 
     private class ShowPasswordAction implements ActionListener { 
         @Override
