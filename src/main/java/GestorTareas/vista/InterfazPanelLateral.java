@@ -4,10 +4,6 @@
  */
 package GestorTareas.vista;
 
-/**
- *
- * @author jesuz
- */
 import GestorTareas.modelo.BaseDeDatos;
 import GestorTareas.modelo.GestorTareas;
 import GestorTareas.modelo.PanelLateral;
@@ -20,10 +16,11 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.URL;
 import java.sql.SQLException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.stream.Collectors;
 
 public class InterfazPanelLateral extends JPanel {
@@ -36,6 +33,9 @@ public class InterfazPanelLateral extends JPanel {
     private JButton selectedFilterButton;
     private PanelLateral panelLateral;
     private GestorTareas gestor;
+    private Timer autoRefreshTimer;
+    private static int lastTaskCount = 0;
+    private String currentFilter = "Tareas";  // <-- GUARDAR EL FILTRO ACTUAL
 
     public InterfazPanelLateral(InterfazPrincipal parent, BaseDeDatos db, Usuario user) {
         this.parent = parent;
@@ -121,6 +121,32 @@ public class InterfazPanelLateral extends JPanel {
         add(filterPanel, BorderLayout.SOUTH);
 
         loadTasks();
+
+        // Timer de auto-refresco cada 10 segundos - pero aplica el MISMO filtro
+        autoRefreshTimer = new java.util.Timer();
+        autoRefreshTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                SwingUtilities.invokeLater(() -> reloadWithCurrentFilter());
+            }
+        }, 10000, 10000); // 10 segundos
+    }
+
+    // Método nuevo: recargar manteniendo el filtro actual
+    private void reloadWithCurrentFilter() {
+        try {
+            List<Tarea> tasks = db.obtenerTareasPorUsuario(user.getIdUsuario());
+            int currentCount = tasks.size();
+            
+            // Solo recargar si hubo cambios en la cantidad de tareas
+            if (currentCount != lastTaskCount) {
+                lastTaskCount = currentCount;
+                // Volver a aplicar el filtro guardado en lugar de cargar todo
+                filterTasks(currentFilter);
+            }
+        } catch (SQLException ex) {
+            // Silencioso para no molestar
+        }
     }
 
     private List<String> obtenerCategoriasUnicas() {
@@ -183,9 +209,11 @@ public class InterfazPanelLateral extends JPanel {
         try {
             titlesModel.clear();
             List<Tarea> tasks = db.obtenerTareasPorUsuario(user.getIdUsuario());
+            lastTaskCount = tasks.size();
             tasks.stream()
                     .filter(t -> t.getEstado() == Tarea.Estado.Pendiente)
                     .forEach(titlesModel::addElement);
+            currentFilter = "Tareas";  // Reset filtro por defecto
         } catch (SQLException ex) {
             ToastNotification.showToast(parent, "Error al cargar tareas: " + ex.getMessage(), true);
         }
@@ -195,9 +223,14 @@ public class InterfazPanelLateral extends JPanel {
         try {
             titlesModel.clear();
             List<Tarea> tasks = db.obtenerTareasPorUsuario(user.getIdUsuario());
+            lastTaskCount = tasks.size();
+            
+            // GUARDAR el filtro actual para el auto-refresco
+            currentFilter = filter;
+            
             List<Tarea> filteredTasks = switch (filter) {
                 case "Mi Día" -> tasks.stream()
-                        .filter(t -> t.getEstado() == Tarea.Estado.Pendiente && t.getFechaDeVencimiento().toLocalDate().equals(LocalDate.now()))
+                        .filter(t -> t.getEstado() == Tarea.Estado.Pendiente && t.getFechaDeVencimiento().toLocalDate().equals(java.time.LocalDate.now()))
                         .toList();
                 case "Importante" -> tasks.stream()
                         .filter(t -> t.getEstado() == Tarea.Estado.Pendiente && t.getPrioridad() == Tarea.Prioridad.Importante)
@@ -286,7 +319,7 @@ public class InterfazPanelLateral extends JPanel {
         statusArea.setLineWrap(true);
         statusArea.setWrapStyleWord(true);
         statusArea.setEditable(false);
-        setBorder(BorderFactory.createEmptyBorder());
+        statusArea.setBorder(BorderFactory.createEmptyBorder());
         panel.add(statusArea, gbc);
 
         gbc.gridy = 5;
@@ -297,7 +330,7 @@ public class InterfazPanelLateral extends JPanel {
         priorityArea.setLineWrap(true);
         priorityArea.setWrapStyleWord(true);
         priorityArea.setEditable(false);
-        setBorder(BorderFactory.createEmptyBorder());
+        priorityArea.setBorder(BorderFactory.createEmptyBorder());
         panel.add(priorityArea, gbc);
 
         gbc.gridwidth = 1; gbc.gridy = 6;
@@ -335,7 +368,7 @@ public class InterfazPanelLateral extends JPanel {
         deleteButton.setForeground(Color.WHITE);
         deleteButton.setPreferredSize(new Dimension(120, 50));
         deleteButton.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(detailsDialog, "¿Eliminar tarea?", "Confirmar", JOptionPane.YES_NO_OPTION);
+            int confirm = JOptionPane.showConfirmDialog (detailsDialog, "¿Eliminar tarea?", "Confirmar", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
                     db.eliminarTarea(task.getIdTarea());

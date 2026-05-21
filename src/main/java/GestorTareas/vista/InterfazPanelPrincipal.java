@@ -39,9 +39,11 @@ public class InterfazPanelPrincipal extends JPanel {
     private JLabel timeLabel;
     private JLabel dateLabel;
     private Timer vencimientoTimer;
+    private Timer autoRefreshTimer;
     private static Set<String> notifiedVencidas = new HashSet<>();
     private PanelPrincipal panelPrincipal;
     private Calendario calendario;
+    private static int lastTaskCount = 0;
 
     public InterfazPanelPrincipal(InterfazPrincipal parent, BaseDeDatos db, Usuario user) {
         this.parent = parent;
@@ -290,7 +292,7 @@ public class InterfazPanelPrincipal extends JPanel {
 
         gbc.gridy = 3;
         JTextArea dateArea = new JTextArea("Fecha Vencimiento: " + task.getFechaDeVencimiento().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
-        dateArea.setFont(new Font("Arial", Font.PLAIN, 18));
+                dateArea.setFont(new Font("Arial", Font.PLAIN, 18));
         dateArea.setForeground(Color.WHITE);
         dateArea.setBackground(new Color(26, 26, 26));
         dateArea.setLineWrap(true);
@@ -307,7 +309,7 @@ public class InterfazPanelPrincipal extends JPanel {
         statusArea.setLineWrap(true);
         statusArea.setWrapStyleWord(true);
         statusArea.setEditable(false);
-        setBorder(BorderFactory.createEmptyBorder());
+        statusArea.setBorder(BorderFactory.createEmptyBorder());
         panel.add(statusArea, gbc);
 
         gbc.gridy = 5;
@@ -318,7 +320,7 @@ public class InterfazPanelPrincipal extends JPanel {
         priorityArea.setLineWrap(true);
         priorityArea.setWrapStyleWord(true);
         priorityArea.setEditable(false);
-        setBorder(BorderFactory.createEmptyBorder());
+        priorityArea.setBorder(BorderFactory.createEmptyBorder());
         panel.add(priorityArea, gbc);
 
         gbc.gridwidth = 1; gbc.gridy = 6;
@@ -442,8 +444,11 @@ public class InterfazPanelPrincipal extends JPanel {
                             notifiedVencidas.add(taskId);
                         }
                     }
-                                        taskModel.addElement(task);
+                    taskModel.addElement(task);
                 });
+            
+            // Actualizar contador de tareas para detectar cambios
+            lastTaskCount = tasks.size();
         } catch (SQLException ex) {
             ToastNotification.showToast(parent, "Error al cargar tareas: " + ex.getMessage(), true);
         }
@@ -465,4 +470,3 @@ public class InterfazPanelPrincipal extends JPanel {
         }
     }
 }
-       

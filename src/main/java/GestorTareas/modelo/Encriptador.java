@@ -1,33 +1,25 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package GestorTareas.modelo;
 
-/**
- *
- * @author jesuz
- */
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import at.favre.lib.crypto.bcrypt.BCrypt;
 
 public class Encriptador {
-    // Métodos
+
     public static String hashearContraseña(String contraseña) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(contraseña.getBytes());
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+
+        return BCrypt.withDefaults()
+                .hashToString(10, contraseña.toCharArray());
     }
 
     public static boolean verificarContraseña(String contraseña, String hash) {
-        return hashearContraseña(contraseña).equals(hash);
+        if(hash.startsWith("$2a$")
+                || hash.startsWith("$2b$")
+                || hash.startsWith("$2y$")) {
+
+            BCrypt.Result result = BCrypt.verifyer()
+                    .verify(contraseña.toCharArray(), hash);
+
+            return result.verified;
+        }
+        return contraseña.equals(hash);
     }
 }

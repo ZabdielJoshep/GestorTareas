@@ -15,13 +15,18 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.TimerTask;
 
 public class InterfazPrincipal extends JFrame {
     private Usuario user;
     private BaseDeDatos db;
     private InterfazPanelPrincipal panelPrincipal;
     private InterfazPanelLateral panelLateral;
-    private Timer timer;
+    
+    // Declarar con nombre completo para evitar conflictos
+    private javax.swing.Timer timer;
+    private java.util.Timer autoRefreshTimer;
+    
     private JButton logoutIcon;
     private Sesion sesion;
 
@@ -66,6 +71,11 @@ public class InterfazPrincipal extends JFrame {
                     sesion.cerrarSesion();
                     user.cerrarSesion();
                     db.cerrarConexion();
+                    
+                    // Cancelar timers al cerrar sesión
+                    if (timer != null) timer.stop();
+                    if (autoRefreshTimer != null) autoRefreshTimer.cancel();
+                    
                     dispose();
                     new VentanaLogin().setVisible(true);
                 }
@@ -82,8 +92,18 @@ public class InterfazPrincipal extends JFrame {
         panelPrincipal = new InterfazPanelPrincipal(this, db, user);
         add(panelPrincipal, BorderLayout.CENTER);
 
-        timer = new Timer(1000, e -> panelPrincipal.updateDateTime());
+        // Timer de Swing para actualizar hora cada 1 segundo
+        timer = new javax.swing.Timer(1000, e -> panelPrincipal.updateDateTime());
         timer.start();
+
+        // Timer java.util para auto-refresco cada 10 segundos
+        autoRefreshTimer = new java.util.Timer();
+        autoRefreshTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                SwingUtilities.invokeLater(() -> refreshTasks());
+            }
+        }, 10000, 10000); // 10 segundos = 10000 ms
     }
 
     public void refreshTasks() {
